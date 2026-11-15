@@ -6,7 +6,20 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Nyx/Scenes/Manutencao_Interativa.unity
+    guid: abc0a1a21c932b744b96a8f21c139358
+  - enabled: 1
+    path: Assets/Nyx/Scenes/Manutencao_24.unity
+    guid: 9ae1b89f7a2b5b548beea6924ccf919f
+  - enabled: 1
+    path: Assets/Nyx/Scenes/Manutencao.unity
+    guid: 7ff084daa14fe124a807541504c460e3
+  - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
+  - enabled: 1
+    path: Assets/Nyx/Scenes/Fuga_02.unity
+    guid: 540146fc7449bbb42a4a43472e550b3a
   m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
