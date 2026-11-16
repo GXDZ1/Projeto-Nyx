@@ -17,6 +17,12 @@ Num futuro próximo, um prisioneiro é retirado da cela para testar uma arma exp
 
 A fase de manutenção começa logo após a saída pelo duto. O jogador aprende a criar dois portais conectados nas superfícies brancas, atravessa um vão em chamas e leva uma célula auxiliar até o terminal para destrancar a saída. Essa fase é a base para os próximos trechos da fuga e para a introdução cinematográfica planejada.
 
+## Como o projeto está organizado
+
+Os arquivos da fase ficam em `Assets/Nyx`. As imagens ficam em `Art`, as cenas em `Scenes` e os scripts são separados por assunto. O guia [Assets/Nyx/README.md](Assets/Nyx/README.md) explica o papel de cada script e algumas partes de C# usadas no protótipo.
+
+A fase principal começa com o tutorial e segue por três setores da prisão. Ela inclui guardas com comportamentos diferentes, cientistas ao fundo, caixas para cobertura e armadilhas temporizadas com rotas de portal. Checkpoints distribuídos entre os setores reduzem o trecho a repetir quando o jogador cai em uma armadilha ou é atingido.
+
 ## Como jogar na Unity
 
 1. Clone o repositório e adicione a pasta do projeto pelo Unity Hub.

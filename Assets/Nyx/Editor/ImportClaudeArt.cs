@@ -9,9 +9,13 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 namespace Nyx.Editor {
 [InitializeOnLoad]
-public static class ImportClaudeArt {
+public static partial class ImportClaudeArt {
  const string Root="Assets/Nyx/Art/Claude/";
+ const string Extras="Assets/Nyx/Art/";
  public const string ScenePath="Assets/Nyx/Scenes/Manutencao_Interativa.unity";
+ const float MaintenanceDoorX=82f;
+ const int MaintenanceEndX=86;
+ const float FireStart=42f, FireEnd=53f, CellX=63.5f, TerminalX=74f;
  static Transform art;
  static string Plain(string value) {
   var decomposed=value.Normalize(NormalizationForm.FormD);
@@ -22,21 +26,25 @@ public static class ImportClaudeArt {
   if(!File.Exists("work/import-claude.request")) return;
   if(EditorApplication.isPlayingOrWillChangePlaymode||EditorApplication.isCompiling||EditorApplication.isUpdating) { EditorApplication.delayCall+=Check; return; }
   File.Delete("work/import-claude.request");
+  var activeScene=SceneManager.GetActiveScene();
+  if(activeScene.IsValid()&&activeScene.isLoaded&&activeScene.isDirty) {
+   File.WriteAllText("work/import-claude.result","SCENE_DIRTY");
+   Debug.LogWarning("NYX_IMPORT_SKIPPED_UNSAVED_SCENE");
+   return;
+  }
   try { Apply(); File.WriteAllText("work/import-claude.result","OK"); } catch(Exception e) { File.WriteAllText("work/import-claude.result",e.ToString()); Debug.LogException(e); }
  }
  static Sprite S(string name,bool character=false) { return AssetDatabase.LoadAssetAtPath<Sprite>(Root+(character?"Character/":"Environment/")+name+".png"); }
  static Sprite[] Frames(string prefix,int count,bool character=false) { return Enumerable.Range(0,count).Select(i=>S(prefix+i,character)).ToArray(); }
+ static Sprite Extra(string folder,string name) { return AssetDatabase.LoadAssetAtPath<Sprite>(Extras+folder+"/"+name+".png"); }
+ static Sprite[] ExtraFrames(string folder,string prefix,int count) { return Enumerable.Range(0,count).Select(i=>Extra(folder,prefix+i)).ToArray(); }
+ static SpriteRenderer PlaceExtra(string folder,string sprite,float x,float y,float scale,int order) {
+  var g=new GameObject(sprite); g.transform.SetParent(art); g.transform.position=new Vector3(x,y,0); g.transform.localScale=Vector3.one*scale;
+  var r=g.AddComponent<SpriteRenderer>(); r.sprite=Extra(folder,sprite); r.sortingOrder=order; return r;
+ }
  static SpriteRenderer Place(string sprite,float x,float y,float scale,int order,Color tint) {
   var g=new GameObject(sprite); g.transform.SetParent(art); g.transform.position=new Vector3(x,y,0); g.transform.localScale=Vector3.one*scale;
   var r=g.AddComponent<SpriteRenderer>(); r.sprite=S(sprite); r.sortingOrder=order; r.color=tint; return r;
- }
- static TextMesh Sign(string text,float x,float y) {
-  var panel=new GameObject("Tutorial plaque"); panel.transform.SetParent(art); panel.transform.position=new Vector3(x,y,.1f); panel.transform.localScale=new Vector3(3.4f,.72f,1);
-  var plate=panel.AddComponent<SpriteRenderer>(); plate.sprite=AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Nyx/Art/pixel.png");
-  plate.color=new Color(.025f,.055f,.09f,.92f); plate.sortingOrder=7;
-  var g=new GameObject("Tutorial: "+text); g.transform.SetParent(art); g.transform.position=new Vector3(x,y,-.1f);
-  var t=g.AddComponent<TextMesh>(); t.text=text; t.fontSize=32; t.characterSize=.07f; t.anchor=TextAnchor.MiddleCenter; t.alignment=TextAlignment.Center; t.color=new Color(.76f,.91f,1);
-  t.GetComponent<MeshRenderer>().sortingOrder=8; return t;
  }
  static NyxCrate EnsureCrate(GameObject target) {
   var crates=target.GetComponents<NyxCrate>();
@@ -69,7 +77,8 @@ public static class ImportClaudeArt {
   ti.textureType=TextureImporterType.Sprite; ti.spriteImportMode=SpriteImportMode.Single; ti.spritePixelsPerUnit=24;
   ti.filterMode=FilterMode.Point; ti.mipmapEnabled=false; ti.textureCompression=TextureImporterCompression.Uncompressed; ti.alphaIsTransparency=true; ti.isReadable=true;
   var set=new TextureImporterSettings(); ti.ReadTextureSettings(set); set.spriteAlignment=9;
-  set.spritePivot=path.Contains("/Character/")?new Vector2(10f/24,0):path.Contains("/Generated/Fire/")?new Vector2(.5f,0):new Vector2(.5f,.5f); ti.SetTextureSettings(set); ti.SaveAndReimport();
+  bool characterSprite=path.Contains("/Character/")||path.Contains("/Guardas/")||path.Contains("/Personagens/");
+  set.spritePivot=characterSprite?new Vector2(10f/24,0):path.Contains("/Generated/Fire/")?new Vector2(.5f,0):new Vector2(.5f,.5f); ti.SetTextureSettings(set); ti.SaveAndReimport();
  }
  static Sprite[] GenerateFireSprites() {
   const int width=32,height=40,count=6;
@@ -98,6 +107,12 @@ public static class ImportClaudeArt {
   var pit=new GameObject("Fire pit");
   pit.transform.SetParent(art,false);
   pit.transform.position=new Vector3(start+width*.5f,rim-.42f,0);
+  var rimSprite=S("chao_perigo");
+  var panelSprite=S("chao_miolo");
+  PlacePitFloorRow(pit.transform,rimSprite,width,0f,1.1f,new Color(.86f,.81f,.77f));
+  PlacePitFloorRow(pit.transform,panelSprite,width,-1.1f,1.8f,new Color(.69f,.70f,.78f));
+  PlacePitFloorRow(pit.transform,panelSprite,width,-2.9f,1.8f,new Color(.61f,.63f,.72f));
+
   var hazard=pit.AddComponent<BoxCollider2D>();
   hazard.isTrigger=true;
   hazard.size=new Vector2(width,1.04f);
@@ -119,19 +134,95 @@ public static class ImportClaudeArt {
    fire.frames=frames;
   }
  }
+ static void PlacePitFloorRow(Transform pit, Sprite sprite, float width, float top, float height, Color tint) {
+  int tileCount=Mathf.CeilToInt(width/2f);
+  float tileWidth=width/tileCount;
+  for(int i=0;i<tileCount;i++) {
+   var tile=new GameObject("Revestimento da fornalha");
+   tile.transform.SetParent(pit,false);
+   tile.transform.localPosition=new Vector3(-width*.5f+(i+.5f)*tileWidth,top-height*.5f,0);
+   tile.transform.localScale=new Vector3(tileWidth/sprite.bounds.size.x,height/sprite.bounds.size.y,1);
+   var renderer=tile.AddComponent<SpriteRenderer>();
+   renderer.sprite=sprite;
+   renderer.color=tint;
+   renderer.sortingOrder=0;
+  }
+ }
+ static void PlaceWallTiles(int start, int end) {
+  var tint=new Color(.56f,.58f,.7f);
+  for(int x=start;x<end;x+=2) for(int y=1;y<13;y+=2) {
+   string tile=y==3?"parede_fundo_listra":x%12==4?"parede_fundo_cano_v":y==9?"parede_fundo_cano_h":"parede_fundo";
+   Place(tile,x+1,y,2,-20,tint);
+  }
+ }
+
+ public static void SavePhases() {
+  ImportPresentationArt();
+  SaveMaintenance();
+  BuildMaintenance.CreateNextPhase();
+  OrganizarCenas.Aplicar();
+ }
+
+ static void ImportPresentationArt() {
+  foreach(var folder in new[]{"Limites","Tutorial"}) {
+   string directory=Extras+folder;
+   if(!Directory.Exists(directory)) continue;
+   foreach(var file in Directory.GetFiles(directory,"*.png")) {
+    string path=file.Replace('\\','/');
+    if(AssetImporter.GetAtPath(path) is TextureImporter importer&&
+     (importer.textureType!=TextureImporterType.Sprite||importer.filterMode!=FilterMode.Point)) Import(path);
+   }
+  }
+ }
+
+ static Texture2D TutorialTexture(string name) =>
+  AssetDatabase.LoadAssetAtPath<Texture2D>(Extras+"Tutorial/"+name+".png");
+
+ static Texture2D[] TutorialFrames(string name,int count) => Enumerable.Range(0,count)
+  .Select(i=>TutorialTexture(name+i)).Where(texture=>texture!=null).ToArray();
+
+ static TrechoTutorial Dica(float inicio,float fim,string setor,string titulo,string dica,
+  AssuntoTutorial assunto=AssuntoTutorial.Orientacao,Texture2D[] quadros=null) =>
+   new TrechoTutorial {inicio=inicio,fim=fim,setor=setor,titulo=titulo,dica=dica,
+    assunto=assunto,quadros=quadros??Array.Empty<Texture2D>()};
+
+ static void ConfigurarTutorial(MaintenanceLevel level,params TrechoTutorial[] trechos) {
+  var tutorial=level.GetComponent<TutorialPercurso>();
+  if(tutorial==null) tutorial=level.gameObject.AddComponent<TutorialPercurso>();
+  tutorial.fase=level;
+  tutorial.trechos=trechos;
+  tutorial.teclaE=TutorialTexture("tecla_e");
+  tutorial.mouseEsquerdo=TutorialTexture("mouse_botao_esquerdo");
+  tutorial.mouseDireito=TutorialTexture("mouse_botao_direito");
+  tutorial.trocarArma=TutorialFrames("painel_trocar_arma_",10);
+ }
+
  [MenuItem("Nyx/Apply interactive phase")]
  public static void Apply() {
   foreach(var file in Directory.GetFiles(Root,"*.png",SearchOption.AllDirectories)) Import(file.Replace('\\','/'));
-  var fireFrames=GenerateFireSprites();
+  AssetDatabase.Refresh();
+  foreach(var folder in new[]{"Guardas","Personagens","Armadilhas"})
+   foreach(var file in Directory.GetFiles(Extras+folder,"*.png",SearchOption.AllDirectories)) Import(file.Replace('\\','/'));
+  ImportPresentationArt();
+  GenerateFireSprites();
+  SaveMaintenance();
+ }
+
+ static void SaveMaintenance() {
+  var fireFrames=Enumerable.Range(0,6)
+   .Select(i=>AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Nyx/Art/Generated/Fire/fire_{i}.png")).ToArray();
+  if(fireFrames.Any(frame=>frame==null)) fireFrames=GenerateFireSprites();
   if(!File.Exists(ScenePath)) File.Copy("Assets/Nyx/Scenes/Manutencao_24.unity",ScenePath);
   AssetDatabase.Refresh();
-  var before=SceneManager.GetActiveScene(); var scene=EditorSceneManager.OpenScene(ScenePath,OpenSceneMode.Single);
-  if(scene.isDirty) throw new Exception("Save the interactive phase before regenerating its art.");
+  if(SceneManager.GetActiveScene().isDirty)
+   throw new InvalidOperationException("Salve a cena aberta antes de atualizar a manutenção.");
+  var scene=EditorSceneManager.OpenScene(ScenePath,OpenSceneMode.Single);
   var level=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<MaintenanceLevel>(true)).Single();
   foreach(var old in scene.GetRootGameObjects().Where(g=>Plain(g.name).StartsWith("interactive tutorial art")).ToArray()) UnityEngine.Object.DestroyImmediate(old);
   foreach(var roof in scene.GetRootGameObjects().Where(g=>Plain(g.name)=="teto portalavel").ToArray()) UnityEngine.Object.DestroyImmediate(roof);
   // Remove legacy objects that were authored outside the generated art root in older scene versions.
-  var staleNames=new[]{"camera_0","alarme_on","alarme_off","espinhos","superficie_portal_grande","fire hazard","chao_perigo","caixa_pequena","caixa_grande"};
+  var staleNames=new[]{"camera_0","alarme_on","alarme_off","espinhos","superficie_portal_grande","fire hazard","chao_perigo",
+   "caixa_pequena","caixa_grande","porta_aberta","frasco","mesa_lab","terminal_0","armario","janela_terra"};
   foreach(var stale in scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Transform>(true))
    .Where(t=>staleNames.Contains(Plain(t.name))).ToArray()) if(stale!=null) UnityEngine.Object.DestroyImmediate(stale.gameObject);
   foreach(var oldSurface in scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<PortalSurface>(true)).ToArray())
@@ -143,42 +234,71 @@ public static class ImportClaudeArt {
   string[] hide={"parede","junta vertical","junta horizontal","rebite","faixa da prisao","tubulacao","suporte tubulacao","luminaria","luz de emergencia","reflexo vermelho","chao inicial","chao setor auxiliar","borda inicial","borda auxiliar","vao","arco eletrico","faisca","moldura do duto","duto aberto","tampa arrancada","moldura da saida"};
   foreach(var root in scene.GetRootGameObjects()) {
    var r=root.GetComponent<SpriteRenderer>(); if(r!=null&&hide.Contains(Plain(root.name))) r.enabled=false;
-   if(root.name=="Caixa baixa") ConfigureCrate(r,S("caixa_pequena"),.5f);
-   if(root.name=="Caixa alta") ConfigureCrate(r,S("caixa_pequena"),1f);
+   if(root.name=="Caixa baixa") {
+    root.transform.position=new Vector3(20,0,0);
+    ConfigureCrate(r,S("caixa_pequena"),.5f);
+   }
+   if(root.name=="Caixa alta") {
+    root.transform.position=new Vector3(27,0,0);
+    ConfigureCrate(r,S("caixa_pequena"),1f);
+   }
   }
   var violetFrames=Frames("portal_roxo_",4); var greenFrames=Frames("portal_verde_",4);
   level.purplePortalFrames=violetFrames; level.greenPortalFrames=greenFrames;
-  var ceiling=new GameObject("Teto portalavel"); ceiling.layer=8; ceiling.transform.position=new Vector3(31,11.8f,0); ceiling.transform.localScale=new Vector3(72,.8f,1);
+  var leftFloor=scene.GetRootGameObjects().Single(g=>Plain(g.name)=="chao inicial").transform;
+  leftFloor.position=new Vector3((FireStart-2)*.5f,-.65f,0);
+  leftFloor.localScale=new Vector3(FireStart+2,1.3f,1);
+  var rightFloor=scene.GetRootGameObjects().Single(g=>Plain(g.name)=="chao setor auxiliar").transform;
+  rightFloor.position=new Vector3((FireEnd+MaintenanceEndX)*.5f,-.65f,0);
+  rightFloor.localScale=new Vector3(MaintenanceEndX-FireEnd,1.3f,1);
+  var endWall=scene.GetRootGameObjects().Single(g=>Plain(g.name)=="fim do corredor").transform;
+  endWall.position=new Vector3(MaintenanceEndX+.5f,5.7f,0);
+  endWall.localScale=new Vector3(1,11.4f,1);
+  var ceiling=new GameObject("Teto portalavel"); ceiling.layer=8;
+  ceiling.transform.position=new Vector3((MaintenanceEndX-4)*.5f,11.8f,0);
+  ceiling.transform.localScale=new Vector3(MaintenanceEndX+4,.8f,1);
   var ceilingArt=ceiling.AddComponent<SpriteRenderer>(); ceilingArt.sprite=AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Nyx/Art/pixel.png"); ceilingArt.color=new Color(.16f,.23f,.34f); ceilingArt.sortingOrder=-4;
   ceiling.AddComponent<BoxCollider2D>();
   var wallTint=new Color(.56f,.58f,.7f);
-  for(int x=-2;x<66;x+=2) for(int y=1;y<13;y+=2) {
-   string tile=y==3?"parede_fundo_listra":x%12==4?"parede_fundo_cano_v":y==9?"parede_fundo_cano_h":"parede_fundo";
-   Place(tile,x+1,y,2,-20,wallTint);
-  }
-  foreach(var start in new[]{-2,29}) for(int x=start;x<(start==-2?18:65);x+=2) {
-   Place("chao_topo",x+1,-1,2,1,Color.white); Place("chao_miolo",x+1,-3,2,1,new Color(.7f,.7f,.8f));
-  }
+  PlaceWallTiles(-2,MaintenanceEndX);
+  BuildLimitWallArt(-2f,true);
+  BuildLimitWallArt(MaintenanceEndX+.5f,false);
+  PlaceFloorTiles(-2,FireStart);
+  PlaceFloorTiles(FireEnd,MaintenanceEndX);
   Place("duto_saida",2.5f,1,2,2,Color.white); Place("duto_grade_caida",4.3f,.5f,1.4f,3,Color.white);
-  var crate=Place("caixa_grande",39,0,1,4,Color.white);
+  var crate=Place("caixa_grande",67.2f,0,1,4,Color.white);
   ConfigureCrate(crate,crate.sprite,1f);
-  foreach(float x in new[]{2f,29f,58f}) {
+  foreach(float x in new[]{2f,34f,76f}) {
    var lamp=Place("alarme_on",x,5,1.4f,-10,Color.white); var loop=lamp.gameObject.AddComponent<SpriteLoop>(); loop.target=lamp; loop.frames=new[]{S("alarme_on"),S("alarme_off")}; loop.fps=2;
   }
-  foreach(float x in new[]{4f,24f,44f,60f}) Place("camera_0",x,7,1.5f,-10,Color.white);
-  Place("janela_terra",7,6,1.7f,-12,new Color(.8f,.8f,1)); Place("janela_terra",37,6,1.7f,-12,new Color(.8f,.8f,1));
-  Place("armario",45,2,2,-11,wallTint); Place("mesa_lab",35,1,1.5f,-11,wallTint); Place("frasco",34.5f,2,1.5f,-10,Color.white);
-  var fan=Place("ventilador_0",22,6,2,-11,wallTint); var fanLoop=fan.gameObject.AddComponent<SpriteLoop>(); fanLoop.target=fan; fanLoop.frames=Frames("ventilador_",3);
+  foreach(float x in new[]{4f,24f,35f,77f}) Place("camera_0",x,7,1.5f,-10,Color.white);
+  Place("janela_terra",8,6,1.7f,-12,new Color(.8f,.8f,1));
+  Place("janela_terra",65.5f,6,1.7f,-12,new Color(.8f,.8f,1));
+  PlaceOnSurface("armario",78,0,2,-11,wallTint);
+  PlaceOnSurface("mesa_lab",61.3f,0,1.5f,-11,wallTint);
+  PlaceOnSurface("frasco",60.4f,1,1.5f,-10,Color.white);
+  var fan=Place("ventilador_0",29,6,2,-11,wallTint); var fanLoop=fan.gameObject.AddComponent<SpriteLoop>(); fanLoop.target=fan; fanLoop.frames=Frames("ventilador_",3);
   PlacePitFire(scene,level,fireFrames);
+  CreateCheckpoint(58,level);
+  CreateReactiveScientist(level,"Ana na manutenção","ana",62.5f,1.85f,1.3f);
+  AddScientist("cientista_velho_sentado_",3,79.6f,.02f);
+  CreateBackgroundScientist("Técnico da manutenção","cientista_leo_parado_",2,61,.02f);
+  MarcaDeSetor(14,"OFICINA");
+  MarcaDeSetor(34,"PASSAGEM DE SERVIÇO");
+  MarcaDeSetor(57.5f,"ENERGIA AUXILIAR");
   for(int i=0;i<Mathf.Min(2,level.pads.Length);i++) {
    var p=level.pads[i];
    bool floorPad=i==0;
+   p.transform.position=new Vector3(floorPad?39f:56f,p.transform.position.y,0f);
    float panelY=floorPad?-.625f:10.775f;
    var whiteWall=Place("superficie_portal_grande",p.transform.position.x,panelY,1.25f,2,Color.white);
    whiteWall.transform.rotation=Quaternion.Euler(0,0,90);
    whiteWall.gameObject.layer=8;
    var wallCollider=whiteWall.gameObject.AddComponent<BoxCollider2D>(); wallCollider.size=new Vector2(1,2);
-   var targetCollider=whiteWall.gameObject.AddComponent<BoxCollider2D>(); targetCollider.size=new Vector2(1,2.2f); targetCollider.isTrigger=true;
+   var targetCollider=whiteWall.gameObject.AddComponent<BoxCollider2D>();
+   targetCollider.size=whiteWall.sprite.bounds.size;
+   targetCollider.offset=whiteWall.sprite.bounds.center;
+   targetCollider.isTrigger=true;
    var topFrame=whiteWall.gameObject.AddComponent<BoxCollider2D>(); topFrame.size=new Vector2(1,.18f); topFrame.offset=new Vector2(0,.91f); topFrame.enabled=false;
    var bottomFrame=whiteWall.gameObject.AddComponent<BoxCollider2D>(); bottomFrame.size=new Vector2(1,.18f); bottomFrame.offset=new Vector2(0,-.91f); bottomFrame.enabled=false;
    var wallSurface=whiteWall.gameObject.AddComponent<PortalSurface>(); wallSurface.collider2D=targetCollider; wallSurface.solidCollider=wallCollider; wallSurface.portalFrameColliders=new[]{topFrame,bottomFrame}; wallSurface.fixedNormal=floorPad?Vector2.up:Vector2.down; wallSurface.snapToEdge=false;
@@ -202,29 +322,67 @@ public static class ImportClaudeArt {
   var weaponRenderer=player.weapon.GetComponent<SpriteRenderer>(); if(weaponRenderer!=null) weaponRenderer.sortingOrder=13;
   foreach(var muzzleRenderer in player.weapon.GetComponentsInChildren<SpriteRenderer>(true)) if(muzzleRenderer!=weaponRenderer) muzzleRenderer.sortingOrder=14;
   var bodyCollider=player.GetComponent<BoxCollider2D>(); bodyCollider.size=new Vector2(.75f,1.8f); bodyCollider.offset=new Vector2(0,.9f); bodyCollider.edgeRadius=.07f;
-  player.bodyCollider=bodyCollider; player.groundMask=(1<<0)|(1<<8); player.jumpSpeed=10.8f;
+  player.bodyCollider=bodyCollider; player.groundMask=(1<<0)|(1<<8); player.jumpSpeed=8.6f;
   var anim=player.GetComponent<PrisonerSpriteAnimator>(); if(anim==null) anim=player.gameObject.AddComponent<PrisonerSpriteAnimator>();
   anim.player=player; anim.neckPixel=AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Nyx/Art/pixel.png"); anim.idle=Frames("idle_",4,true); anim.walk=Frames("walk_",6,true); anim.walkBack=Frames("walk_",6,true).Reverse().ToArray(); anim.idleGun=Frames("idle_gun_",2,true);
   anim.walkGun=Frames("walk_gun_",6,true); anim.shoot=Frames("shoot_",3,true); anim.jump=S("jump_0",true); anim.fall=S("fall_0",true);
   var phys=new PhysicsMaterial2D("Player traction"){friction=.32f,bounciness=0}; bodyCollider.sharedMaterial=phys;
   var oldSocket=level.socket.GetComponent<SpriteRenderer>(); if(oldSocket!=null) oldSocket.enabled=false;
-  Place("terminal_0",42,1,2,1,Color.white);
+  var indicatorPosition=level.socketIndicator!=null?level.socketIndicator.transform.position:Vector3.zero;
+  level.socket.position=new Vector3(TerminalX,1,0);
+  if(level.socketIndicator!=null)
+   level.socketIndicator.transform.position=new Vector3(TerminalX,indicatorPosition.y,indicatorPosition.z);
+  Place("terminal_0",TerminalX,1,2,1,Color.white);
   var door=level.securityDoor.GetComponent<SpriteRenderer>(); door.sprite=S("porta_fechada"); door.transform.localScale=Vector3.one*1.3f;
-  door.transform.position=new Vector3(48,1.95f,0); door.color=Color.white;
-  var doorCollider=door.GetComponent<BoxCollider2D>(); doorCollider.size=new Vector2(1.3f,3); doorCollider.offset=Vector2.zero;
-  Place("porta_aberta",48,1.95f,1.3f,-2,Color.white);
+  door.transform.position=new Vector3(MaintenanceDoorX,1.95f,0); door.color=Color.white;
+  level.doorRenderer=door;
+  level.closedDoorSprite=S("porta_fechada");
+  level.openDoorSprite=S("porta_aberta");
+  var doorCollider=door.GetComponent<BoxCollider2D>();
+  if(doorCollider!=null) UnityEngine.Object.DestroyImmediate(doorCollider);
+  if(level.exit!=null) level.exit.position=new Vector3(MaintenanceDoorX,0,0);
   var cellRenderer=level.energyCell.GetComponent<SpriteRenderer>(); cellRenderer.sprite=S("caixa_pequena"); cellRenderer.color=Color.white;
-  var hand=new GameObject("Auxiliary cell in hand"); hand.transform.SetParent(player.transform,false); hand.transform.localPosition=new Vector3(.48f,1.08f,0);
-  var handRenderer=hand.AddComponent<SpriteRenderer>(); handRenderer.sprite=cellRenderer.sprite; handRenderer.sortingOrder=12; hand.transform.localScale=new Vector3(.52f,.62f,1); hand.SetActive(false);
-  level.handCell=hand.transform; level.boltSprite=S("portal_roxo_0");
-  Sign("CLIQUE: ESQ. ROXO / DIR. VERDE",8,4.15f);
-  Sign("ESPACO: PULAR / EMPURRE A CAIXA",13,2.25f);
-  Sign("E: PEGAR CELULA AUXILIAR",36,2.45f);
-  Sign("E: ATIVAR A PORTA",45,4.1f);
-  EditorSceneManager.SaveScene(scene);
+  level.energyCell.transform.position=new Vector3(CellX,.5f,0f);
+  level.energyCellSprite=cellRenderer.sprite;
+  const string handName="Auxiliary cell in hand";
+  var hand=level.handCell;
+  if(hand==null||hand.parent!=player.transform) {
+   hand=new GameObject(handName).transform;
+   hand.SetParent(player.transform,false);
+  }
+  foreach(var copy in player.transform.Cast<Transform>().Where(child=>child!=hand&&child.name==handName).ToArray())
+   UnityEngine.Object.DestroyImmediate(copy.gameObject);
+  hand.localPosition=new Vector3(.48f,1.08f,0);
+  hand.localScale=new Vector3(.52f,.62f,1);
+  var handRenderer=hand.GetComponent<SpriteRenderer>();
+  if(handRenderer==null) handRenderer=hand.gameObject.AddComponent<SpriteRenderer>();
+  handRenderer.sprite=cellRenderer.sprite;
+  handRenderer.sortingOrder=12;
+  hand.gameObject.SetActive(false);
+  level.handCell=hand; level.boltSprite=S("portal_roxo_0");
+  level.weaponBulletSprite=Extra("Armadilhas","bala_jogador");
+  level.powerOn=false; level.phaseTwo=false; level.weaponUnlocked=false; level.firearmMode=false;
+  player.portalWeapon=player.weapon;
+  var portalWeaponRenderer=player.portalWeapon.GetComponent<SpriteRenderer>();
+  if(portalWeaponRenderer!=null) {
+   portalWeaponRenderer.sprite=Extra("Armadilhas","arma_portal_icone");
+   portalWeaponRenderer.color=Color.white;
+   player.portalWeapon.localScale=new Vector3(.45f,.45f,1);
+  }
+  level.cameraMinX=-2f; level.cameraMaxX=MaintenanceEndX;
+  level.cameraRoom=Rect.MinMaxRect(-2.5f,-4f,MaintenanceEndX+1f,12.2f);
+  ConfigurarTutorial(level,
+   Dica(-2.5f,14f,"SAÍDA DO DUTO","De volta ao corredor","Use <b>A</b> e <b>D</b> ou as setas para andar. Siga as luzes da oficina.",
+    quadros:TutorialFrames("painel_andar_",12)),
+   Dica(14f,34f,"OFICINA","Dá pra passar por cima","Aperte <b>Espaço</b> para pular. Segure um pouco mais para subir, ou ande contra uma caixa para empurrá-la.",
+    quadros:TutorialFrames("painel_pular_",10)),
+   Dica(34f,57.5f,"PASSAGEM DE SERVIÇO","O corredor pegou fogo","",AssuntoTutorial.Portais),
+   Dica(57.5f,70f,"ENERGIA AUXILIAR","Uma célula de reserva","Aproxime-se da célula roxa e use <b>E</b> para pegá-la.",AssuntoTutorial.Celula),
+   Dica(70f,78f,"ENERGIA AUXILIAR","O terminal está ali","Leve a célula até o terminal e pressione <b>E</b> para ligar a energia.",AssuntoTutorial.Terminal),
+   Dica(78f,87f,"SAÍDA DA MANUTENÇÃO","A trava cedeu","Aproxime-se da porta e pressione <b>E</b> para seguir.",AssuntoTutorial.Porta));
+  if(!EditorSceneManager.SaveScene(scene)) throw new IOException("A Unity não conseguiu salvar a manutenção.");
   EditorBuildSettings.scenes=new[]{new EditorBuildSettingsScene(ScenePath,true)}.Concat(EditorBuildSettings.scenes.Where(x=>x.path!=ScenePath)).ToArray();
   AssetDatabase.SaveAssets();
-  if(before.IsValid()&&before.isLoaded&&before.path!=ScenePath&&Application.isBatchMode) SceneManager.SetActiveScene(before);
   Debug.Log("NYX_INTERACTIVE_ART_IMPORTED");
  }
 }

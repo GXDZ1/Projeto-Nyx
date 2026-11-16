@@ -116,48 +116,15 @@ public static class BuildMaintenance {
  [MenuItem("Nyx/Build interactive Windows preview")]
  public static void Build() {
   if(!System.IO.File.Exists(ImportClaudeArt.ScenePath)) ImportClaudeArt.Apply();
-  CreateNextPhase();
+  if(!File.Exists(ImportClaudeArt.SecurityScenePath)) CreateNextPhase();
   var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions {
-   scenes=new[]{Nyx.Editor.ImportClaudeArt.ScenePath,"Assets/Nyx/Scenes/Fuga_02.unity"}, locationPathName="Builds/Nyx-Manutencao-Interativa/Nyx.exe",
+   scenes=new[]{Nyx.Editor.ImportClaudeArt.ScenePath,ImportClaudeArt.SecurityScenePath}, locationPathName="Builds/Nyx-Manutencao-Interativa/Nyx.exe",
    target=BuildTarget.StandaloneWindows64, options=BuildOptions.None
   });
   if(report.summary.result!=UnityEditor.Build.Reporting.BuildResult.Succeeded) throw new System.Exception("Build failed");
   Debug.Log("NYX_BUILD_OK");
  }
  public static void BuildLatest() { ImportClaudeArt.Apply(); Build(); }
- public static void CreateNextPhase() {
-  var path="Assets/Nyx/Scenes/Fuga_02.unity";
-  if(File.Exists(path)) return;
-  var previous=SceneManager.GetActiveScene();
-  var scene=EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
-  var level=new GameObject("Fase 02 — Corredor de fuga").AddComponent<MaintenanceLevel>();
-  var cam=new GameObject("Main Camera").AddComponent<Camera>(); cam.tag="MainCamera"; cam.orthographic=true; cam.orthographicSize=7.5f; cam.transform.position=new Vector3(0,3,-10); cam.backgroundColor=C("080e19"); cam.clearFlags=CameraClearFlags.SolidColor; cam.gameObject.AddComponent<AudioListener>(); level.gameCamera=cam;
-  Box("Parede lunar",0,4,42,14,"121e2d",-10);
-  for(int x=-20;x<22;x+=2) Box("Painel",x,4,1.94f,13,"1b2a3c",-9);
-  Box("Piso",0,-.65f,42,1.3f,"334459",0,true);
-  for(int x=-20;x<22;x+=2) Box("Borda do piso",x,-.06f,2,.12f,"6b7b8d",1);
-  Box("Parede fim",20,3,1,7,"263448",0,true);
-  Label("SETOR C  /  FUGA",0,5,.32f);
-  Label("A manutencao caiu. Encontre uma saida.",0,3.5f,.18f);
-  var pg=new GameObject("Prisioneiro"); pg.transform.position=new Vector3(-17,.15f,0);
-  var player=pg.AddComponent<Prisoner>(); player.level=level; level.player=player;
-  player.body=pg.AddComponent<Rigidbody2D>(); player.body.gravityScale=2.4f; player.body.constraints=RigidbodyConstraints2D.FreezeRotation; player.body.collisionDetectionMode=CollisionDetectionMode2D.Continuous; player.body.interpolation=RigidbodyInterpolation2D.Interpolate;
-  var col=pg.AddComponent<BoxCollider2D>(); col.size=new Vector2(.75f,1.8f); col.offset=new Vector2(0,.9f); player.bodyCollider=col;
-  var visual=new GameObject("Sprite"); visual.transform.SetParent(pg.transform,false); visual.transform.localScale=Vector3.one*2; player.visual=visual.transform; player.sprite=visual.AddComponent<SpriteRenderer>();
-  var anim=pg.AddComponent<PrisonerSpriteAnimator>(); anim.player=player;
-  var root="Assets/Nyx/Art/Claude/Character/";
-  anim.idle=Enumerable.Range(0,4).Select(i=>AssetDatabase.LoadAssetAtPath<Sprite>(root+"idle_"+i+".png")).ToArray();
-  anim.walk=Enumerable.Range(0,6).Select(i=>AssetDatabase.LoadAssetAtPath<Sprite>(root+"walk_"+i+".png")).ToArray();
-  anim.idleGun=Enumerable.Range(0,2).Select(i=>AssetDatabase.LoadAssetAtPath<Sprite>(root+"idle_gun_"+i+".png")).ToArray();
-  anim.walkGun=Enumerable.Range(0,6).Select(i=>AssetDatabase.LoadAssetAtPath<Sprite>(root+"walk_gun_"+i+".png")).ToArray(); anim.jump=AssetDatabase.LoadAssetAtPath<Sprite>(root+"jump_0.png"); anim.fall=AssetDatabase.LoadAssetAtPath<Sprite>(root+"fall_0.png");
-  var gun=Box("Arma de portais",0,0,.5f,.22f,"7542a8",11); gun.transform.SetParent(pg.transform,false); player.weapon=gun.transform;
-  var phaseArm=Box("Braco de mira",0,0,.34f,.13f,"89b9ac",10); phaseArm.transform.SetParent(pg.transform,false); player.arm=phaseArm.transform;
-  var exit=new GameObject("Saida provisoria").transform; exit.position=new Vector3(19,0,0); level.exit=exit;
-  Label("CONTINUA",16,2,.24f);
-  EditorSceneManager.SaveScene(scene,path);
-  var scenes=EditorBuildSettings.scenes.Where(s=>s.path!="Assets/Nyx/Scenes/Fuga_02.unity").ToList(); scenes.Add(new EditorBuildSettingsScene(path,true)); EditorBuildSettings.scenes=scenes.ToArray();
-  AssetDatabase.SaveAssets();
-  if(previous.IsValid()&&previous.isLoaded) SceneManager.SetActiveScene(previous);
- }
+ public static void CreateNextPhase() => ImportClaudeArt.SaveSecurityWing();
 }
 }

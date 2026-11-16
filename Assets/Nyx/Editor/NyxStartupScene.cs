@@ -5,7 +5,10 @@ using UnityEngine.SceneManagement;
 namespace Nyx.Editor {
 [InitializeOnLoad]
 public static class NyxStartupScene {
- static NyxStartupScene() { EditorApplication.delayCall+=OpenLevel; }
+ static NyxStartupScene() { EditorApplication.delayCall+=OpenIfNoScene; }
+ static void OpenIfNoScene() {
+  if(!Application.isBatchMode&&string.IsNullOrEmpty(SceneManager.GetActiveScene().path)) OpenLevel();
+ }
  [MenuItem("Nyx/Abrir fase de manutenção")]
  public static void OpenLevel() {
   if(EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) return;

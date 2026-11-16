@@ -1,0 +1,53 @@
+VBCSCompilerPreWarmer: pre-warm launched (dotnet PID 33240)
+VBCSCompiler prewarm took 91.03 ms
+[Licensing::Module] Trying to connect to existing licensing client channel...
+Built from 'trunk' branch; Version is '6000.7.0a4 (7305b6f6fd4f) revision 7538102'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26300) Professional' Language: 'pt' Physical Memory: 32452 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+System  architecture: x64
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-adria" at "2026-11-15T21:30:55.7758912Z"
+Process architecture: x64
+Date: 2026-11-15T21:30:55Z
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 24580, path: "C:/Program Files/Unity/Hub/Editor/6000.5.6f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Error: HandshakeResponse reported an error:
+	ResponseCode: 505
+	ResponseStatus: Unsupported protocol version '1.19.0-rc.1'.
+[Licensing::Module] Error: Failed to handshake to channel: "LicenseClient-adria"
+[Licensing::IpcConnector] LicenseClient-adria channel disconnected successfully.
+[Licensing::IpcConnector] Channel LicenseClient-adria-6000.7.0 doesn't exist
+[Licensing::Module] Successfully launched the LicensingClient (PId: 30200)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-adria-6000.7.0" at "2026-11-15T21:30:56.157606Z"
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 30200, path: "C:/Program Files/Unity/Hub/Editor/6000.7.0a4/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.19.0-rc.1+a1d64c6
+  Session Id:              29c1cb8c7ef740088e11953750a6738c
+  Correlation Id:          008c8b87270cafef61184b0bb84163c7
+  External correlation Id: 7921579650330722569
+  Machine Id:              4GP5lIzBL0Zc0p89pHZKut/VeDo=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-adria-6000.7.0" (connect: 0.10s, validation: 0.32s, handshake: 0.04s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-adria-6000.7.0-notifications" at "2026-11-15T21:30:56.5138721Z"
+[Licensing::Module] Connected to LicensingClient (PId: 30200, launch time: 0.15, total connection time: 0.46s)
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 4674083102759-gxdz1-UnityProStuXXXX
+  Product: Unity Student
+  Type: Assigned
+  Expiration: 2027-08-21T22:40:21Z
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 0.77s
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity\Hub\Editor\6000.7.0a4\Editor\Unity.exe
+-batchmode
+-projectPath
+++
+-executeMethod
+Nyx.Editor.BuildMaintenance.BuildLatest
+-logFile
+++
+Couldn't set project path to: D:/Nýx/++
+[ExitDontLaunchBugReporter] Exiting without the bug reporter. Application will exit with return code 1
