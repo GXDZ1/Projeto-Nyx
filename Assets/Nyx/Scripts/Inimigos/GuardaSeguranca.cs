@@ -17,10 +17,10 @@ namespace Nyx
         public float patrolStart;
         public float patrolEnd;
         public float walkSpeed = 1.4f;
-        public float detectionRange = 10f;
-        [Range(15f, 85f)] public float visionHalfAngle = 38f;
+        public float detectionRange = 15f;
+        [Range(15f, 85f)] public float visionHalfAngle = 60f;
         public float shotCooldown = 2.2f;
-        public float health = 50f;
+        public float health = 75f;
         public bool usesGun;
         public bool frontArmor;
         public Vector2 pursuitRange;
@@ -35,10 +35,16 @@ namespace Nyx
         Collider2D guardCollider;
         bool dying;
         bool walking;
-        bool hadSight;
+        float trackUntil = float.NegativeInfinity;
+        Vector2 lastSeenFeet;
+        Vector2 patrolHome;
+        int lastPlayerFalls;
+        bool returningToPatrol;
+        readonly RotaGuarda rota = new RotaGuarda();
         float meleeHitsAt = float.PositiveInfinity;
         ContactFilter2D sightFilter;
         readonly RaycastHit2D[] sightHits = new RaycastHit2D[12];
+        readonly RaycastHit2D[] movementHits = new RaycastHit2D[8];
 
         void Awake()
         {
@@ -50,6 +56,7 @@ namespace Nyx
                 guardCollider.isTrigger = true;
 
             facing = startsFacingLeft ? -1 : 1;
+            patrolHome = transform.position;
             sightFilter.useTriggers = false;
             sightFilter.SetLayerMask((1 << 0) | (1 << 8));
             if (alertMark != null)
@@ -62,19 +69,41 @@ namespace Nyx
             if (dying || level == null || level.player == null || level.completed)
                 return;
 
-            bool seesPlayer = CanSeePlayer(out var playerPosition);
-            if (alertMark != null)
-                alertMark.gameObject.SetActive(seesPlayer);
             bool stationary = Mathf.Abs(patrolEnd - patrolStart) < .1f;
-            if (seesPlayer && !hadSight && laserSight != null)
+            if (lastPlayerFalls != level.falls)
+            {
+                lastPlayerFalls = level.falls;
+                trackUntil = float.NegativeInfinity;
+                returningToPatrol = !stationary;
+            }
+            bool tracking = Time.time < trackUntil;
+            bool seesPlayer = CanSeePlayer(tracking, out var playerPosition);
+            if (seesPlayer)
+            {
+                trackUntil = Time.time + (stationary ? .8f : 4f);
+                lastSeenFeet = level.player.transform.position;
+                returningToPatrol = !stationary;
+                AimAt(playerPosition);
+            }
+            if (alertMark != null)
+                alertMark.gameObject.SetActive(seesPlayer || tracking);
+            if (seesPlayer && !tracking && laserSight != null)
                 nextShotTime = Mathf.Max(nextShotTime, Time.time + .77f);
-            hadSight = seesPlayer;
             float distanceX = Mathf.Abs(playerPosition.x - transform.position.x);
-            bool canShoot = usesGun && seesPlayer && (stationary || distanceX <= 5.2f);
+            float heightDifference = Mathf.Abs(lastSeenFeet.y - transform.position.y);
+            bool canShoot = usesGun && seesPlayer && (stationary || distanceX <= 5.2f && heightDifference < 1.2f);
             bool canStrike = !usesGun && seesPlayer && distanceX < 1.2f
                 && Mathf.Abs(playerPosition.y - transform.position.y - 1.05f) < .8f;
             walking = false;
             UpdateLaserSight(seesPlayer, playerPosition);
+
+            if (rota.Pulando)
+            {
+                transform.position = rota.AvancarSalto();
+                walking = true;
+                UpdateAnimation(false);
+                return;
+            }
 
             if (Time.time >= meleeHitsAt)
             {
@@ -85,7 +114,6 @@ namespace Nyx
 
             if (canShoot)
             {
-                AimAt(playerPosition);
                 if (Time.time >= nextShotTime)
                 {
                     ShootAt(playerPosition);
@@ -94,12 +122,11 @@ namespace Nyx
                 }
                 else if (!stationary && distanceX > 3.1f && Time.time >= attackAnimationEnds)
                 {
-                    walking = MoveAlongFloor(playerPosition.x, walkSpeed * 1.8f);
+                    SeguirRota(lastSeenFeet, walkSpeed * 1.8f);
                 }
             }
             else if (canStrike)
             {
-                AimAt(playerPosition);
                 if (Time.time >= nextShotTime)
                 {
                     nextShotTime = Time.time + .75f;
@@ -107,17 +134,48 @@ namespace Nyx
                     meleeHitsAt = Time.time + .20f;
                 }
             }
-            else if (seesPlayer && !stationary)
+            else if (!stationary && (seesPlayer || tracking))
             {
-                AimAt(playerPosition);
-                walking = MoveAlongFloor(playerPosition.x, walkSpeed * 1.8f);
+                SeguirRota(lastSeenFeet, walkSpeed * 1.8f);
             }
-            else
+            else if (!stationary && returningToPatrol)
+            {
+                if (Vector2.Distance(transform.position, patrolHome) < .5f)
+                    returningToPatrol = false;
+                else
+                    SeguirRota(patrolHome, walkSpeed);
+            }
+            else if (!stationary)
             {
                 Patrol();
             }
 
             UpdateAnimation(canShoot || canStrike);
+        }
+
+        void SeguirRota(Vector2 destino, float velocidade)
+        {
+            Vector2 anterior = transform.position;
+            walking = rota.Mover(this, destino, velocidade, out var proxima);
+            transform.position = proxima;
+            if (Mathf.Abs(proxima.x - anterior.x) > .005f)
+                facing = proxima.x > anterior.x ? 1 : -1;
+        }
+
+        internal bool EncontrarBloqueio(Vector2 posicao, Vector2 movimento, out Collider2D barreira)
+        {
+            barreira = null;
+            if (movimento.sqrMagnitude < .000001f) return false;
+            int count = Physics2D.BoxCast(posicao + Vector2.up * .75f, new Vector2(.69f, 1.3f), 0f,
+                movimento.normalized, sightFilter, movementHits, movimento.magnitude);
+            for (int i = 0; i < count; i++)
+            {
+                var candidato = movementHits[i].collider;
+                if (candidato == null || candidato.attachedRigidbody == level.player.body) continue;
+                barreira = candidato;
+                return true;
+            }
+            return false;
         }
 
         public void TakeDamage(float amount, Vector2 shotDirection = default)
@@ -167,7 +225,7 @@ namespace Nyx
             gameObject.SetActive(false);
         }
 
-        bool CanSeePlayer(out Vector2 playerPosition)
+        bool CanSeePlayer(bool tracking, out Vector2 playerPosition)
         {
             playerPosition = level.player.BodyCenter;
             Vector2 eyes = (Vector2)transform.position + Vector2.up * (laserSight != null ? .2f : 1.2f);
@@ -176,13 +234,10 @@ namespace Nyx
 
             if (!level.player.body.simulated || distance > detectionRange || distance < .01f)
                 return false;
-            if (pursuitRange.y > pursuitRange.x &&
-                (playerPosition.x < pursuitRange.x || playerPosition.x > pursuitRange.y))
-                return false;
 
             Vector2 direction = difference / distance;
-            float visionLimit = Mathf.Cos(visionHalfAngle * Mathf.Deg2Rad);
-            if (direction.x * facing < visionLimit)
+            // O cone serve para detectar. Depois disso, pode virar para o alvo visível.
+            if (!tracking && direction.x * facing < Mathf.Cos(visionHalfAngle * Mathf.Deg2Rad))
                 return false;
 
             int count = Physics2D.Raycast(eyes, direction, sightFilter, sightHits, distance);

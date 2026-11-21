@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using UnityEditor;
+using System.Linq;
 using UnityEngine;
 
 namespace Nyx.Editor
@@ -12,7 +13,8 @@ namespace Nyx.Editor
         static readonly EditorBuildSettingsScene[] Fases =
         {
             new EditorBuildSettingsScene("Assets/Nyx/Scenes/Manutencao_Interativa.unity", true),
-            new EditorBuildSettingsScene("Assets/Nyx/Scenes/Fuga_02.unity", true)
+            new EditorBuildSettingsScene("Assets/Nyx/Scenes/Fuga_02.unity", true),
+            new EditorBuildSettingsScene(ImportClaudeArt.CoreScenePath, true)
         };
 
         static OrganizarCenas()
@@ -23,13 +25,13 @@ namespace Nyx.Editor
         [MenuItem("Nyx/Organizar cenas das fases")]
         public static void Aplicar()
         {
-            foreach (var fase in Fases)
+            foreach (var fase in Fases.Take(2))
             {
                 if (!File.Exists(fase.path))
                     throw new FileNotFoundException("Cena da fase não encontrada", fase.path);
             }
 
-            EditorBuildSettings.scenes = Fases;
+            EditorBuildSettings.scenes = Fases.Where(fase => File.Exists(fase.path)).ToArray();
             AssetDatabase.SaveAssets();
             Debug.Log("NYX_PHASE_SCENES_READY");
         }

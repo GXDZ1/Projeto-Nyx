@@ -254,21 +254,43 @@ namespace Nyx
         void UpdateWeapon()
         {
             float angle = Mathf.Atan2(AimDirection.y, AimDirection.x) * Mathf.Rad2Deg;
+            var rotation = Quaternion.Euler(0f, 0f, angle);
+            Vector3 shoulder = AimShoulder;
+            Vector3 hand = AimHand;
 
             if (arm != null)
             {
-                Vector2 shoulder = new Vector2(AimFacing * .2f, .72f);
-                arm.localPosition = shoulder + AimDirection.normalized * .15f;
-                arm.localRotation = Quaternion.Euler(0, 0, angle);
+                arm.localPosition = (shoulder + hand) * .5f;
+                Vector3 reach = hand - shoulder;
+                float armAngle = Mathf.Atan2(reach.y, reach.x) * Mathf.Rad2Deg;
+                arm.localRotation = Quaternion.Euler(0f, 0f, armAngle);
+                var armScale = arm.localScale;
+                armScale.x = reach.magnitude + .04f;
+                arm.localScale = armScale;
             }
 
             if (weapon == null)
                 return;
 
-            weapon.localPosition = new Vector3(AimFacing * .42f, .75f + AimDirection.y * .08f, 0);
-            weapon.localScale = new Vector3(.5f, .22f, 1);
-            weapon.localRotation = Quaternion.Euler(0, 0, angle);
+            float scale = weapon == firearm ? .72f : .82f;
+            weapon.localScale = new Vector3(scale, scale * AimFacing, 1f);
+            weapon.localRotation = rotation;
+
+            // Encaixa o cabo na mão, compensando o pivô que fica no centro do sprite.
+            Vector3 grip = weapon == firearm
+                ? WeaponSpritePoint(8.5f, 11.5f)
+                : WeaponSpritePoint(10.5f, 12.5f);
+            weapon.localPosition = hand - rotation * Vector3.Scale(grip, weapon.localScale);
         }
+
+        Vector3 AimShoulder => new Vector3(AimFacing * .23f, .64f, 0f);
+
+        // Ao mirar para cima, a mão abre para o lado e mantém a arma fora do rosto.
+        Vector3 AimHand => AimShoulder + (Vector3)AimDirection * .30f
+            + Vector3.right * (AimFacing * Mathf.Max(0f, AimDirection.y) * .24f);
+
+        // Os dois sprites medem 32 × 16 pixels, com pivô central e 24 pixels por unidade.
+        static Vector3 WeaponSpritePoint(float x, float y) => new Vector3((x - 16f) / 24f, (8f - y) / 24f, 0f);
 
         public void SetWeaponMode(bool useFirearm)
         {
@@ -285,8 +307,10 @@ namespace Nyx
         }
 
         public Vector2 WeaponTip => weapon != null
-            ? (Vector2)weapon.position + (Vector2)weapon.right * .34f
-            : (Vector2)transform.position + new Vector2(Facing * .42f, .95f);
+            ? (Vector2)weapon.TransformPoint(weapon == firearm
+                ? WeaponSpritePoint(30f, 5.5f)
+                : WeaponSpritePoint(31f, 7.5f))
+            : (Vector2)transform.TransformPoint(AimHand);
 
         public void AimAt(Vector2 point)
         {
@@ -294,7 +318,7 @@ namespace Nyx
             if (Mathf.Abs(horizontalDistance) > .3f)
                 AimFacing = horizontalDistance > 0 ? 1 : -1;
 
-            Vector2 shoulder = (Vector2)transform.position + new Vector2(AimFacing * .42f, .75f);
+            Vector2 shoulder = transform.TransformPoint(AimShoulder);
             Vector2 direction = point - shoulder;
             if (direction.sqrMagnitude > .001f)
                 AimDirection = direction.normalized;

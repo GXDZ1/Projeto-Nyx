@@ -27,6 +27,7 @@ namespace Nyx.Editor
                 art = new GameObject("Ala de segurança").transform;
                 var level = new GameObject("Fase 02 - Fuga").AddComponent<MaintenanceLevel>();
                 level.phaseTwo = true;
+                level.nextScene = Path.GetFileNameWithoutExtension(CoreScenePath);
                 level.cameraMinX = 74f;
                 level.cameraMaxX = WingRight - 1;
                 level.cameraRoom = Rect.MinMaxRect(WingLeft, -4f, WingRight, 12.2f);
@@ -49,6 +50,7 @@ namespace Nyx.Editor
                 BuildRoomFrame();
                 BuildSecurityWing(level);
                 CreateSecurityPlayer(level);
+                ConfigurarInventario(level);
 
                 var pistol = PlaceExtra("Armadilhas", "pistola_item", 70.5f, .65f, 2f, 8);
                 pistol.gameObject.name = "Pistola de segurança";
@@ -193,6 +195,7 @@ namespace Nyx.Editor
                 .pursuitRange = new Vector2(81.5f, 93.5f);
             CreateRetractingSpikes(98f, 2.8f, level);
             CreateCrate(77f, .8f);
+            CriarCaixaMunicao(level, 79f);
 
             CreateGuard(level, "Guarda armado", "guarda_pistola", "guarda_pistola_atirar_", true, 124, 132, 1.1f)
                 .pursuitRange = new Vector2(119f, 134.8f);
@@ -200,20 +203,25 @@ namespace Nyx.Editor
             CreateCrate(118f, 1f);
             CreateFloorPortal(112f, level);
             CreateFloorPortal(135.8f, level);
+            CriarCaixaMunicao(level, 108.5f);
 
             var armored = CreateGuard(level, "Guarda antimotim", "guarda_antimotim", null, false, 164, 173, .98f);
             armored.pursuitRange = new Vector2(158f, 176f);
             armored.frontArmor = true;
+            armored.health = 100f;
             CreateSteamVent(180.5f, level);
+            CriarCaixaMunicao(level, 148.5f);
 
             CreateGuard(level, "Guarda socador", "guarda_socador", "guarda_socador_soco_", false, 205, 214, 1.45f)
                 .pursuitRange = new Vector2(199f, 216.5f);
             CreateCrusher(222f, level);
+            CriarCaixaMunicao(level, 190.5f);
 
             CreateFloorSegment("Piso antes do tanque", Doca, 259f);
             CreateFloorSegment("Piso depois do tanque", 266f, WingRight - 1f);
             CreateTurret(level, 248.5f);
             CreateCrate(239.2f, 1f);
+            CriarCaixaMunicao(level, 231.5f);
             CreateAcidPit(259f, 266f, level);
             CreatePortalWall(259f, Vector2.left, level);
             CreateCeilingPortal(270f, level);
@@ -234,8 +242,10 @@ namespace Nyx.Editor
             CreateBackgroundScientist("Técnico da doca", "cientista_leo_parado_", 2, 234.4f, .03f);
 
             ConfigurarTutorial(level,
-                Dica(64f,81.5f,triagem,"Uma pistola no chão","Chegue perto dela e pressione <b>E</b>. Há espaço aqui para experimentar a mira.",
+                Dica(64f,74f,triagem,"Uma pistola no chão","Chegue perto dela e pressione <b>E</b>. O inventário no canto mostra qual ferramenta está na mão.",
                     AssuntoTutorial.Equipamento,TutorialFrames("painel_interagir_",8)),
+                Dica(74f,81.5f,triagem,"Cada tiro conta","Experimente atirar, recarregar e recolher a caixa antes de seguir.",
+                    AssuntoTutorial.Municao),
                 Dica(81.5f,94.8f,triagem,"Guarda com cassetete","Ele precisa se aproximar para bater. Se aparecer um <b>!</b>, recue e mantenha distância.",
                     quadros:TutorialFrames("painel_inimigo_cassetete_",15)),
                 Dica(94.8f,Vigilancia,triagem,"Espinhos retráteis","Espere as pontas baixarem. Atravesse o trecho de uma vez, antes que elas subam."),
@@ -552,6 +562,7 @@ namespace Nyx.Editor
             guard.patrolEnd = right;
             guard.walkSpeed = speed;
             guard.usesGun = hasGun;
+            guard.health = 75f;
             guard.alertMark = CreateGuardAlert(guard.transform, 1.18f);
             return guard;
         }
@@ -576,8 +587,9 @@ namespace Nyx.Editor
             guard.patrolEnd = x;
             guard.usesGun = true;
             guard.startsFacingLeft = true;
-            guard.detectionRange = 11f;
+            guard.detectionRange = 17f;
             guard.shotCooldown = 2.8f;
+            guard.health = 100f;
             guard.alertMark = CreateGuardAlert(guard.transform, .75f);
             turret.flipX = true;
             var beam = new GameObject("Mira vermelha da torreta");
@@ -691,11 +703,11 @@ namespace Nyx.Editor
             return prop;
         }
 
-        static void CreateSectorLabel(string text, float x)
+        static void CreateSectorLabel(string text, float x, float y = 9.4f)
         {
             var label = new GameObject(text);
             label.transform.SetParent(art, true);
-            label.transform.position = new Vector3(x, 9.4f, 0);
+            label.transform.position = new Vector3(x, y, 0);
 
             var textMesh = label.AddComponent<TextMesh>();
             textMesh.text = text;

@@ -98,11 +98,15 @@ public static partial class ImportClaudeArt {
  }
  static void PlacePitFire(Scene scene, MaintenanceLevel level, Sprite[] frames) {
   var roots=scene.GetRootGameObjects();
-  var leftFloor=roots.Single(g=>Plain(g.name)=="chao inicial").GetComponent<BoxCollider2D>().bounds;
-  var rightFloor=roots.Single(g=>Plain(g.name)=="chao setor auxiliar").GetComponent<BoxCollider2D>().bounds;
-  float start=leftFloor.max.x;
-  float width=rightFloor.min.x-start;
-  float rim=Mathf.Min(leftFloor.max.y,rightFloor.max.y);
+  var leftFloor=roots.Single(g=>Plain(g.name)=="chao inicial").GetComponent<BoxCollider2D>();
+  var rightFloor=roots.Single(g=>Plain(g.name)=="chao setor auxiliar").GetComponent<BoxCollider2D>();
+  // Calcula pelo colisor editado. bounds pode manter a posição anterior no modo de edição.
+  float start=leftFloor.transform.TransformPoint(leftFloor.offset+Vector2.right*leftFloor.size.x*.5f).x;
+  float end=rightFloor.transform.TransformPoint(rightFloor.offset-Vector2.right*rightFloor.size.x*.5f).x;
+  float width=end-start;
+  float rim=Mathf.Min(
+   leftFloor.transform.TransformPoint(leftFloor.offset+Vector2.up*leftFloor.size.y*.5f).y,
+   rightFloor.transform.TransformPoint(rightFloor.offset+Vector2.up*rightFloor.size.y*.5f).y);
 
   var pit=new GameObject("Fire pit");
   pit.transform.SetParent(art,false);
@@ -164,7 +168,7 @@ public static partial class ImportClaudeArt {
  }
 
  static void ImportPresentationArt() {
-  foreach(var folder in new[]{"Limites","Tutorial"}) {
+  foreach(var folder in new[]{"Limites","Tutorial","Inventario"}) {
    string directory=Extras+folder;
    if(!Directory.Exists(directory)) continue;
    foreach(var file in Directory.GetFiles(directory,"*.png")) {
@@ -195,6 +199,8 @@ public static partial class ImportClaudeArt {
   tutorial.mouseEsquerdo=TutorialTexture("mouse_botao_esquerdo");
   tutorial.mouseDireito=TutorialTexture("mouse_botao_direito");
   tutorial.trocarArma=TutorialFrames("painel_trocar_arma_",10);
+  tutorial.teclaR=InventarioTexture("tecla_r_mini");
+  tutorial.caixaMunicao=InventarioTexture("municao_caixa_0");
  }
 
  [MenuItem("Nyx/Apply interactive phase")]
@@ -212,7 +218,7 @@ public static partial class ImportClaudeArt {
   var fireFrames=Enumerable.Range(0,6)
    .Select(i=>AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Nyx/Art/Generated/Fire/fire_{i}.png")).ToArray();
   if(fireFrames.Any(frame=>frame==null)) fireFrames=GenerateFireSprites();
-  if(!File.Exists(ScenePath)) File.Copy("Assets/Nyx/Scenes/Manutencao_24.unity",ScenePath);
+  if(!File.Exists(ScenePath)) File.Copy("Assets/Nyx/Scenes/Arquivo/Manutencao_24.unity",ScenePath);
   AssetDatabase.Refresh();
   if(SceneManager.GetActiveScene().isDirty)
    throw new InvalidOperationException("Salve a cena aberta antes de atualizar a manutenção.");
@@ -371,6 +377,7 @@ public static partial class ImportClaudeArt {
   }
   level.cameraMinX=-2f; level.cameraMaxX=MaintenanceEndX;
   level.cameraRoom=Rect.MinMaxRect(-2.5f,-4f,MaintenanceEndX+1f,12.2f);
+  ConfigurarInventario(level);
   ConfigurarTutorial(level,
    Dica(-2.5f,14f,"SAÍDA DO DUTO","De volta ao corredor","Use <b>A</b> e <b>D</b> ou as setas para andar. Siga as luzes da oficina.",
     quadros:TutorialFrames("painel_andar_",12)),

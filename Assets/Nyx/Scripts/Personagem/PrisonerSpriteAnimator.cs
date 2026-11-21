@@ -22,15 +22,37 @@ namespace Nyx {
   public void Fire() { shotUntil=Time.time+.24f; }
   void LateUpdate() {
    Sprite frame;
+   int weaponTopRow=12, weaponBottomRow=18;
+   float torsoWidth=16f;
+   bool trimWeapon=false;
    bool firingPistol=player.firearm!=null&&player.weapon==player.firearm;
-   if(Time.time<shotUntil&&firingPistol&&shoot!=null&&shoot.Length>0) frame=shoot[Mathf.Clamp((int)((.24f-(shotUntil-Time.time))*12),0,shoot.Length-1)];
-   else if(!player.Grounded) frame=player.body.linearVelocity.y>0 ? jump : fall;
+   bool shotFrame=Time.time<shotUntil&&firingPistol&&shoot!=null&&shoot.Length>0;
+   if(shotFrame) {
+    frame=shoot[Mathf.Clamp((int)((.24f-(shotUntil-Time.time))*12),0,shoot.Length-1)];
+    trimWeapon=true;
+    torsoWidth=15f;
+   }
+   else if(!player.Grounded) {
+    frame=player.body.linearVelocity.y>0 ? jump : fall;
+    trimWeapon=true;
+   }
    else {
     bool moving=Mathf.Abs(player.body.linearVelocity.x)>.1f;
-    bool holdingFirearm=player.firearm!=null&&player.firearm.gameObject.activeInHierarchy;
-    var frames=holdingFirearm ? (moving?walkGun:idleGun) : (moving?walk:idle);
-    if(moving&&player.WalkingBackward&&walkBack!=null&&walkBack.Length>0) frames=walkBack;
-    frame=frames[(int)(Time.time*(moving?10:3))%frames.Length];
+    var armedFrames=moving?walkGun:idleGun;
+    trimWeapon=player.weapon!=null&&player.weapon.gameObject.activeInHierarchy&&armedFrames!=null&&armedFrames.Length>0;
+    var frames=trimWeapon?armedFrames:(moving?walk:idle);
+    bool walkingBack=moving&&player.WalkingBackward;
+    if(!trimWeapon&&walkingBack&&walkBack!=null&&walkBack.Length>0) frames=walkBack;
+    if(frames==null||frames.Length==0) return;
+    int index=(int)(Time.time*(moving?10:3))%frames.Length;
+    if(trimWeapon&&walkingBack) index=frames.Length-1-index;
+    frame=frames[index];
+    if(trimWeapon) {
+     // A arma acompanha o balanço de cada quadro. As linhas são contadas de cima.
+     weaponTopRow=moving?(index==0||index==3?12:13):14+index;
+     weaponBottomRow=weaponTopRow+6;
+     torsoWidth=moving?15f:16f;
+    }
    }
    if(frame==null) return;
    if(!splitFrames.TryGetValue(frame,out var pair)) {
@@ -41,6 +63,12 @@ namespace Nyx {
     var headRect=new Rect(rect.x,rect.y+cut,rect.width,rect.height-cut);
     var bodySprite=Sprite.Create(frame.texture,bodyRect,new Vector2(pivotX,0),ppu,0,SpriteMeshType.FullRect);
     var headSprite=Sprite.Create(frame.texture,headRect,new Vector2(pivotX,0),ppu,0,SpriteMeshType.FullRect);
+    if(trimWeapon&&rect.width==24&&rect.height==24) {
+     float lower=rect.height-weaponBottomRow;
+     float upper=rect.height-weaponTopRow;
+     TrimPaintedWeapon(bodySprite,0f,lower,upper,torsoWidth);
+     TrimPaintedWeapon(headSprite,cut,lower,upper,torsoWidth);
+    }
     pair=new[]{bodySprite,headSprite}; splitFrames.Add(frame,pair); splitHeights.Add(frame,cut/ppu);
    }
    player.sprite.sprite=pair[0];
@@ -60,6 +88,29 @@ namespace Nyx {
    player.visual.localPosition=Vector3.zero;
    player.visual.localScale=Vector3.one*2;
    player.visual.localRotation=Quaternion.identity;
+  }
+
+  static void TrimPaintedWeapon(Sprite sprite,float rowOffset,float firstWeaponRow,float lastWeaponRow,float torsoWidth) {
+   // Recorta só a faixa da arma e mantém o pivô, a cabeça e as pernas no lugar.
+   float height=sprite.rect.height;
+   float lower=Mathf.Clamp(firstWeaponRow-rowOffset,0f,height);
+   float upper=Mathf.Clamp(lastWeaponRow-rowOffset,0f,height);
+   var vertices=new List<Vector2>(12);
+   var triangles=new List<ushort>(18);
+   AddStrip(0f,lower,sprite.rect.width);
+   AddStrip(lower,upper,torsoWidth);
+   AddStrip(upper,height,sprite.rect.width);
+   sprite.OverrideGeometry(vertices.ToArray(),triangles.ToArray());
+
+   void AddStrip(float bottom,float top,float width) {
+    if(top<=bottom) return;
+    ushort start=(ushort)vertices.Count;
+    vertices.Add(new Vector2(0f,bottom));
+    vertices.Add(new Vector2(0f,top));
+    vertices.Add(new Vector2(width,top));
+    vertices.Add(new Vector2(width,bottom));
+    triangles.AddRange(new[]{start,(ushort)(start+1),(ushort)(start+2),start,(ushort)(start+2),(ushort)(start+3)});
+   }
   }
  }
 }

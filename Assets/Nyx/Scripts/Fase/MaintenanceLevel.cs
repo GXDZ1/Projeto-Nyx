@@ -6,6 +6,7 @@ namespace Nyx {
  // Reúne as regras da fase: portais, objetivos, câmera, perigos e tutorial.
  public class MaintenanceLevel : MonoBehaviour {
   const float PortalShotRange = 48f;
+  const float PistolShotRange = 18f;
   const float PortalSurfaceSeamTolerance = .02f;
   const int PortalShotMask = (1 << 8) | (1 << 9);
   public Prisoner player;
@@ -22,6 +23,13 @@ namespace Nyx {
   public Sprite[] purplePortalFrames, greenPortalFrames;
   public bool powerOn, completed, checkpointReached;
   public bool phaseTwo, weaponUnlocked, firearmMode;
+  public bool followVertical;
+  public float fallLimit = -3f;
+  public string nextScene;
+  public Transform[] exitControls;
+  public SpriteRenderer[] exitControlLamps;
+  readonly System.Collections.Generic.HashSet<Transform> activatedExitControls = new();
+  public InventarioJogador inventario;
   public float cameraMinX=14f, cameraMaxX=132f;
   public Rect cameraRoom;
   public int falls;
@@ -36,9 +44,14 @@ namespace Nyx {
   float cameraDesignSize;
   readonly Collider2D[] portalExitHits=new Collider2D[16];
   TutorialPercurso tutorial;
+  MapaParkourGuardas mapaGuardas;
+  internal MapaParkourGuardas MapaGuardas => mapaGuardas ??= new MapaParkourGuardas(this);
 
   void Start() {
    tutorial=GetComponent<TutorialPercurso>();
+   if(inventario==null) inventario=GetComponent<InventarioJogador>();
+   if(inventario==null) inventario=gameObject.AddComponent<InventarioJogador>();
+   inventario.fase=this;
    if(!phaseTwo&&energyCell==null) CreateFallbackEnergyCell();
    if(pads!=null) {
     foreach(var pad in pads) if(pad!=null) pad.level=this;
@@ -56,6 +69,7 @@ namespace Nyx {
    }
    if(player!=null) player.SetWeaponMode(false);
    if(player!=null) checkpoint=player.transform.position;
+   inventario.SalvarPontoDeRetorno();
    if(gameCamera!=null) {
     cameraDesignSize=gameCamera.orthographicSize;
     FollowCamera(1f);
@@ -74,14 +88,17 @@ namespace Nyx {
   void Update() {
    var keys=Keyboard.current; var mouse=Mouse.current;
    if(portalReentryLocked&&Time.time>=teleportReady&&!PlayerOverlapsPortal()) portalReentryLocked=false;
-   if(keys!=null&&keys.rKey.wasPressedThisFrame) { SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); return; }
+   if(keys!=null&&keys.f5Key.wasPressedThisFrame) { SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); return; }
    if(completed||player==null||portalTraversalActive) return;
    if(keys!=null&&keys.qKey.wasPressedThisFrame&&weaponUnlocked) {
     firearmMode=!firearmMode;
+    inventario.ArmaTrocada();
     player.SetWeaponMode(firearmMode);
-    Notify(firearmMode?"Pistola equipada. Q alterna para o lançador de portais.":"Lançador de portais equipado. Q alterna para a pistola.");
+    if(tutorial!=null&&tutorial.EnsinaEquipamento(player.transform.position.x))
+     Notify(firearmMode?"Pistola equipada. Q alterna para o lançador de portais.":"Lançador de portais equipado. Q alterna para a pistola.");
    }
-   if(player.transform.position.y < -3) Respawn();
+   if(keys!=null&&keys.rKey.wasPressedThisFrame) inventario.TentarRecarregar();
+   if(player.transform.position.y < fallLimit) Respawn();
    if(energyCell!=null&&!powerOn&&!Carrying&&energyCell.position.y < -3) {
     ResetCell();
     Notify("A célula voltou ao ponto onde você a encontrou.");
@@ -119,9 +136,12 @@ namespace Nyx {
    float x=Mathf.Lerp(gameCamera.transform.position.x,followX,amount);
    float minX=cameraRoom.xMin+halfWidth, maxX=cameraRoom.xMax-halfWidth;
    float minY=cameraRoom.yMin+height, maxY=cameraRoom.yMax-height;
+   float y=followVertical
+    ? Mathf.Lerp(gameCamera.transform.position.y,player.transform.position.y+3f,amount)
+    : 4.2f;
    gameCamera.transform.position=new Vector3(
     minX<maxX?Mathf.Clamp(x,minX,maxX):cameraRoom.center.x,
-    minY<maxY?Mathf.Clamp(4.2f,minY,maxY):cameraRoom.center.y,-10);
+    minY<maxY?Mathf.Clamp(y,minY,maxY):cameraRoom.center.y,-10);
   }
   void Shoot(int slot) {
    var mouse=Mouse.current;
@@ -157,17 +177,17 @@ namespace Nyx {
    Notify("Mire na direção de uma placa branca para abrir um portal.");
   }
 
-  void FireWeapon() {
+  public void FireWeapon() {
    if(!weaponUnlocked||player==null||gameCamera==null) return;
    var mouse=Mouse.current;
    if(mouse==null) return;
+   if(!inventario.TentarAtirar()) return;
    Vector2 cursor=gameCamera.ScreenToWorldPoint(mouse.position.ReadValue());
    player.AimAt(cursor);
    Vector2 origin=player.WeaponTip;
    Vector2 direction=(cursor-origin).sqrMagnitude>.001f?(cursor-origin).normalized:player.AimDirection;
-   float range=22f;
-   Vector2 end=origin+direction*range;
-   foreach(var hit in Physics2D.RaycastAll(origin,direction,range)) {
+   Vector2 end=origin+direction*PistolShotRange;
+   foreach(var hit in Physics2D.RaycastAll(origin,direction,PistolShotRange)) {
     if(hit.collider==null||hit.collider.transform.IsChildOf(player.transform)) continue;
     var guard=hit.collider.GetComponentInParent<GuardaSeguranca>();
     if(guard!=null) { guard.TakeDamage(25,direction); end=hit.point; break; }
@@ -176,7 +196,7 @@ namespace Nyx {
    if(weaponBulletSprite!=null) {
     var shot=new GameObject("Disparo da pistola");
     var renderer=shot.AddComponent<SpriteRenderer>(); renderer.sprite=weaponBulletSprite; renderer.sortingOrder=30;
-    shot.transform.position=origin; shot.transform.localScale=Vector3.one*.22f;
+    shot.transform.position=origin; shot.transform.localScale=Vector3.one*.36f;
     StartCoroutine(AnimateWeaponShot(shot.transform,origin,end));
    }
    player.GetComponent<PrisonerSpriteAnimator>()?.Fire();
@@ -473,11 +493,21 @@ namespace Nyx {
   public void Interact() {
    if(weaponPickup!=null&&!weaponUnlocked&&Vector2.Distance(player.transform.position,weaponPickup.transform.position)<2.2f) {
     weaponUnlocked=true; firearmMode=true; player.SetWeaponMode(true);
-    weaponPickup.SetActive(false); Notify("Pistola coletada. Aperte Q para alternar entre ela e os portais.");
+    inventario.ArmaTrocada();
+    weaponPickup.SetActive(false); Notify("Pistola coletada. R recarrega e Q troca entre a pistola e os portais.");
     return;
    }
    if(phaseTwo) {
+    if(ActivateExitControl()) return;
     if(exit!=null&&Vector2.Distance(player.transform.position,exit.position)<2.6f) {
+     if(exitControls!=null&&activatedExitControls.Count<exitControls.Length) {
+      Notify($"Saída bloqueada. Ative os terminais de emergência ({activatedExitControls.Count}/{exitControls.Length}).");
+      return;
+     }
+     if(!string.IsNullOrEmpty(nextScene)&&Application.CanStreamedLevelBeLoaded(nextScene)) {
+      completed=true; player.Stop(); SceneManager.LoadScene(nextScene);
+      return;
+     }
      completed=true; player.Stop(); Notify("Fim desta parte da fuga. A saída foi alcançada.");
      var renderer=exit.GetComponent<SpriteRenderer>();
      if(renderer!=null&&openDoorSprite!=null) renderer.sprite=openDoorSprite;
@@ -507,6 +537,21 @@ namespace Nyx {
     energyCell.linearVelocity=Vector2.zero;
    }
   }
+  bool ActivateExitControl() {
+   if(exitControls==null) return false;
+   for(int i=0;i<exitControls.Length;i++) {
+    var control=exitControls[i];
+    if(control==null||Vector2.Distance(player.transform.position,control.position)>=2f) continue;
+    bool firstUse=activatedExitControls.Add(control);
+    if(firstUse&&exitControlLamps!=null&&i<exitControlLamps.Length&&exitControlLamps[i]!=null)
+     exitControlLamps[i].color=new Color(.36f,1f,.57f);
+    Notify(activatedExitControls.Count==exitControls.Length?"Saída liberada. Siga para a porta da doca."
+     :$"Terminal ativado ({activatedExitControls.Count}/{exitControls.Length}). Procure o outro.");
+    return true;
+   }
+   return false;
+  }
+
   void ResetCell() {
    if(energyCell==null) return;
    energyCell.gameObject.SetActive(true); energyCell.position=cellHome;
@@ -519,6 +564,7 @@ namespace Nyx {
    if(portalTraversalActive||completed) return;
    falls++; SetCellCarried(false); if(energyCell!=null&&!powerOn) ResetCell();
    player.Teleport(checkpoint,Vector2.zero);
+   inventario.RestaurarPontoDeRetorno();
    if(!portalReentryLocked) teleportReady=Time.time+.38f;
    Notify(message);
   }
@@ -541,9 +587,11 @@ namespace Nyx {
    if(Vector2.Distance(checkpoint,position)<.5f) return;
    checkpoint=position;
    checkpointReached=true;
+   inventario.SalvarPontoDeRetorno();
    Notify("Ponto de retorno salvo.");
   }
 
   void Notify(string message) => tutorial?.Avisar(message);
+  public void Avisar(string message) => Notify(message);
  }
 }

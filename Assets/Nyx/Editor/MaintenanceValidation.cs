@@ -14,7 +14,7 @@ public static class MaintenanceValidation {
   if(SessionState.GetBool("NyxValidate",false)) EditorApplication.update+=Tick;
  }
  public static void Run() {
-  EditorSceneManager.OpenScene("Assets/Nyx/Scenes/Manutencao_24.unity");
+  EditorSceneManager.OpenScene("Assets/Nyx/Scenes/Arquivo/Manutencao_24.unity");
   SessionState.SetBool("NyxValidate",true);
   EditorApplication.update-=Tick; EditorApplication.update+=Tick;
   EditorApplication.isPlaying=true; deadline=EditorApplication.timeSinceStartup+90;

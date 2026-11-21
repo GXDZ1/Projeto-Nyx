@@ -5,7 +5,7 @@ namespace Nyx
 {
     public enum AssuntoTutorial
     {
-        Orientacao, Portais, Celula, Terminal, Porta, Equipamento
+        Orientacao, Portais, Celula, Terminal, Porta, Equipamento, Municao
     }
 
     [Serializable]
@@ -24,6 +24,7 @@ namespace Nyx
         public TrechoTutorial[] trechos;
         public Texture2D teclaE, mouseEsquerdo, mouseDireito;
         public Texture2D[] trocarArma;
+        public Texture2D teclaR, caixaMunicao;
 
         TrechoTutorial trechoAtual;
         float entrada;
@@ -68,6 +69,7 @@ namespace Nyx
                 float alturaTexto = texto.CalcHeight(new GUIContent(mensagem), 432f);
                 float altura = alturaTexto + 16f;
                 float y = Screen.height / escala - altura - 22f;
+                if (fase.inventario != null) y -= fase.inventario.AlturaHud + 12f;
                 Fundo(new Rect(22f, y, 462f, altura), new Color(.027f, .045f, .075f, .94f));
                 GUI.color = new Color(1f, .86f, .66f);
                 GUI.Label(new Rect(37f, y + 8f, 432f, alturaTexto), mensagem, texto);
@@ -84,6 +86,13 @@ namespace Nyx
                 if (x >= trecho.inicio && x < trecho.fim)
                     return trecho;
             return null;
+        }
+
+        public bool EnsinaEquipamento(float x)
+        {
+            var trecho = AcharTrecho(x);
+            return trecho != null && (trecho.assunto == AssuntoTutorial.Equipamento ||
+                trecho.assunto == AssuntoTutorial.Municao);
         }
 
         void DesenharTrecho(TrechoTutorial trecho, float tempo)
@@ -119,6 +128,39 @@ namespace Nyx
                         dica = fase.firearmMode
                             ? "A pistola está na mão. Use <b>Q</b> para voltar aos portais."
                             : "O lançador está na mão. Use <b>Q</b> para sacar a pistola.";
+                        arte = Quadro(trocarArma, tempo);
+                    }
+                    break;
+                case AssuntoTutorial.Municao:
+                    var inventario = fase.inventario;
+                    if (!fase.weaponUnlocked)
+                    {
+                        chamada = "Falta pegar a pistola";
+                        dica = "Ela está no chão, logo atrás. Chegue perto e aperte <b>E</b>.";
+                        break;
+                    }
+                    arte = teclaR;
+                    if (inventario.TirosDisparados == 0)
+                    {
+                        chamada = "Cada tiro conta";
+                        dica = "A pistola leva <b>12 tiros</b>. Mire com o mouse e use o <b>clique esquerdo</b>. Se o lançador estiver na mão, <b>Q</b> troca de arma.";
+                    }
+                    else if (!inventario.JaRecarregou)
+                    {
+                        chamada = "Abasteça o carregador";
+                        dica = inventario.Recarregando ? "Espere a barra terminar. Você pode continuar andando enquanto recarrega."
+                            : "Use <b>R</b> para passar munição da reserva para o carregador. O número depois da barra é sua reserva.";
+                    }
+                    else if (inventario.MunicaoColetada == 0)
+                    {
+                        chamada = "Uma caixa de munição";
+                        dica = "Passe por cima da caixa verde para recolher <b>12 munições</b> para a reserva. É automático, basta encostar.";
+                        arte = caixaMunicao;
+                    }
+                    else
+                    {
+                        chamada = "Pronto para seguir";
+                        dica = "Acompanhe os números no inventário. <b>R</b> recarrega, <b>Q</b> troca de arma e as caixas verdes repõem a reserva.";
                         arte = Quadro(trocarArma, tempo);
                     }
                     break;

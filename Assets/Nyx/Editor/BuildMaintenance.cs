@@ -101,8 +101,9 @@ public static class BuildMaintenance {
   level.securityDoor=Box("Porta sem energia",48,1.9f,1.7f,3.8f,"5b6374",3,true).gameObject;
   Label("SETOR C  →",54,3,.3f);
   level.exit=new GameObject("Fim da primeira fase").transform; level.exit.position=new Vector3(57,0,0);
-  EditorSceneManager.SaveScene(scene,"Assets/Nyx/Scenes/Manutencao.unity");
-  var path="Assets/Nyx/Scenes/Manutencao.unity";
+  Directory.CreateDirectory("Assets/Nyx/Scenes/Arquivo");
+  EditorSceneManager.SaveScene(scene,"Assets/Nyx/Scenes/Arquivo/Manutencao.unity");
+  var path="Assets/Nyx/Scenes/Arquivo/Manutencao.unity";
   EditorBuildSettings.scenes=new[]{new EditorBuildSettingsScene(path,true)}.Concat(EditorBuildSettings.scenes.Where(s=>s.path!=path)).ToArray();
   AssetDatabase.SaveAssets();
   Debug.Log("NYX_SCENE_CREATED");
@@ -117,8 +118,9 @@ public static class BuildMaintenance {
  public static void Build() {
   if(!System.IO.File.Exists(ImportClaudeArt.ScenePath)) ImportClaudeArt.Apply();
   if(!File.Exists(ImportClaudeArt.SecurityScenePath)) CreateNextPhase();
+  if(!File.Exists(ImportClaudeArt.CoreScenePath)) ImportClaudeArt.SaveCorePhase();
   var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions {
-   scenes=new[]{Nyx.Editor.ImportClaudeArt.ScenePath,ImportClaudeArt.SecurityScenePath}, locationPathName="Builds/Nyx-Manutencao-Interativa/Nyx.exe",
+   scenes=new[]{ImportClaudeArt.ScenePath,ImportClaudeArt.SecurityScenePath,ImportClaudeArt.CoreScenePath}, locationPathName="Builds/Nyx-Manutencao-Interativa/Nyx.exe",
    target=BuildTarget.StandaloneWindows64, options=BuildOptions.None
   });
   if(report.summary.result!=UnityEditor.Build.Reporting.BuildResult.Succeeded) throw new System.Exception("Build failed");

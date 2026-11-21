@@ -21,7 +21,9 @@ A fase de manutenção começa logo após a saída pelo duto. O jogador aprende 
 
 Os arquivos da fase ficam em `Assets/Nyx`. As imagens ficam em `Art`, as cenas em `Scenes` e os scripts são separados por assunto. O guia [Assets/Nyx/README.md](Assets/Nyx/README.md) explica o papel de cada script e algumas partes de C# usadas no protótipo.
 
-A fase principal começa com o tutorial e segue por três setores da prisão. Ela inclui guardas com comportamentos diferentes, cientistas ao fundo, caixas para cobertura e armadilhas temporizadas com rotas de portal. Checkpoints distribuídos entre os setores reduzem o trecho a repetir quando o jogador cai em uma armadilha ou é atingido.
+A manutenção e a ala de segurança são cenas separadas. Na segunda cena, o jogador encontra uma pistola e passa por cinco salas de treino, cada uma apresentando um inimigo e uma armadilha. Há cientistas ao fundo, caixas para cobertura, rotas de portal e checkpoints entre as salas.
+
+O inventário no canto da tela mostra a ferramenta equipada. A pistola começa com 12 balas no carregador e 36 na reserva, com um intervalo mínimo de 0,4 segundo entre os tiros. Recarregar leva 1,1 segundo; encostar nas caixas verdes recolhe automaticamente mais 12 balas para a reserva, até o limite de 120. Se a reserva estiver cheia, a caixa permanece no chão. Os portais continuam disponíveis sem consumir munição. Ao morrer, a munição e as caixas voltam ao estado salvo no checkpoint.
 
 ## Como jogar na Unity
 
@@ -33,6 +35,8 @@ A fase principal começa com o tutorial e segue por três setores da prisão. El
 | --- | --- |
 | **A/D** ou **setas esquerda/direita** | Andar e empurrar caixas. |
 | **Espaço** | Pular. Segure para saltar mais alto. |
-| **Mouse** | Mirar. O clique esquerdo dispara o portal roxo e o direito dispara o verde. |
-| **E** | Pegar, soltar ou instalar a célula auxiliar e interagir com a porta. |
-| **R** | Reiniciar a fase. |
+| **Mouse** | Mirar. Com o lançador: esquerdo abre o portal roxo, direito abre o verde. Com a pistola: esquerdo atira. |
+| **E** | Recolher a pistola, pegar/soltar/instalar a célula e interagir com a porta. A munição é recolhida ao encostar. |
+| **Q** | Alternar entre a pistola e os portais depois de pegar a pistola. |
+| **R** | Recarregar a pistola usando a reserva. |
+| **F5** | Reiniciar a fase. |
